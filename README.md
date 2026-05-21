@@ -4,6 +4,7 @@
 
 <a href="https://github.com/Livioni/SpatialBenchPage"><img src="https://img.shields.io/badge/Parent-SpatialBench-blue" alt="SpatialBench"></a>
 <a href="https://github.com/ByteDance-Seed/Depth-Anything-3"><img src="https://img.shields.io/badge/Built_on-Depth_Anything_3-orange" alt="DA3"></a>
+<a href="https://huggingface.co/ropedia-ai/DA-Next"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging_Face-Model-yellow" alt="DA-Next"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC--BY-green" alt="License"></a>
 
 </div>
