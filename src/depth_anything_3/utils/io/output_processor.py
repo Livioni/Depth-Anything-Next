@@ -61,7 +61,19 @@ class OutputProcessor:
         aux = self._extract_aux(model_output)
         semantic = self._extract_semantic(model_output)
         gaussians = model_output.get("gaussians", None)
-        scale_factor = model_output.get("scale_factor", None)
+        scale_factor = self._extract_scale_factor(model_output.get("scale_factor", None))
+        is_metric = self._extract_is_metric(model_output.get("is_metric", 0))
+
+        # Standard eval-mode DA-Next outputs are already scaled inside the model.
+        # Keep this fallback for custom callers that pass normalized raw outputs
+        # carrying a scale factor. DA3-Nested also marks its internally scaled
+        # output as metric, so the guard prevents either path from scaling twice.
+        if scale_factor is not None and not is_metric:
+            depth = depth * scale_factor
+            if extrinsics is not None:
+                extrinsics = extrinsics.copy()
+                extrinsics[..., :3, 3] *= scale_factor
+            is_metric = 1
 
         return Prediction(
             depth=depth,
@@ -69,12 +81,46 @@ class OutputProcessor:
             conf=conf,
             extrinsics=extrinsics,
             intrinsics=intrinsics,
-            is_metric=getattr(model_output, "is_metric", 0),
+            is_metric=is_metric,
             gaussians=gaussians,
             semantic=semantic,
             aux=aux,
             scale_factor=scale_factor,
         )
+
+    @staticmethod
+    def _extract_scale_factor(scale_factor: object) -> float | None:
+        """Convert the scene-level scale prediction to a validated scalar."""
+        if scale_factor is None:
+            return None
+
+        if torch.is_tensor(scale_factor):
+            values = scale_factor.detach().float().cpu().numpy()
+        else:
+            values = np.asarray(scale_factor, dtype=np.float32)
+
+        if values.size != 1:
+            raise ValueError(
+                "OutputProcessor expects one scene-level scale factor, "
+                f"got shape {values.shape}"
+            )
+
+        value = float(values.reshape(-1)[0])
+        if not np.isfinite(value) or value <= 0:
+            raise ValueError(f"Metric scale factor must be finite and positive, got {value}")
+        return value
+
+    @staticmethod
+    def _extract_is_metric(is_metric: object) -> int:
+        """Normalize tensor/array/scalar metric flags to an integer."""
+        if torch.is_tensor(is_metric):
+            values = is_metric.detach().cpu().numpy()
+        else:
+            values = np.asarray(is_metric)
+
+        if values.size != 1:
+            raise ValueError(f"is_metric must be scalar, got shape {values.shape}")
+        return int(bool(values.reshape(-1)[0]))
 
     def _extract_depth(self, model_output: dict[str, torch.Tensor]) -> np.ndarray:
         """

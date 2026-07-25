@@ -157,10 +157,40 @@ class DepthAnything3Net(nn.Module):
         
         return output
 
-    def _process_scale_head(self, scale_token: torch.Tensor, output: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Process scale head."""
+    def _process_scale_head(
+        self, scale_token: torch.Tensor, output: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """Predict scene scale and restore metric geometry during inference."""
         scale_factor = self.scale_head(scale_token)
         output.scale_factor = scale_factor
+
+        # Training targets are normalized by the per-scene scale, so training
+        # must keep depth and camera translations in normalized coordinates.
+        # During inference, restore metric geometry before exposing raw model
+        # outputs; this also covers evaluators that bypass OutputProcessor.
+        if not self.training:
+            batch_size = output.depth.shape[0]
+            if scale_factor.numel() != batch_size:
+                raise ValueError(
+                    "ScaleHead must return one scale per scene, "
+                    f"got shape {tuple(scale_factor.shape)} for batch size {batch_size}"
+                )
+
+            scene_scale = scale_factor.reshape(batch_size)
+            depth_scale = scene_scale.reshape(
+                batch_size, *([1] * (output.depth.ndim - 1))
+            )
+            output.depth = output.depth * depth_scale
+
+            if output.get("extrinsics", None) is not None:
+                extrinsics = output.extrinsics.clone()
+                translation_scale = scene_scale.reshape(
+                    batch_size, *([1] * (extrinsics[..., :3, 3].ndim - 1))
+                )
+                extrinsics[..., :3, 3] *= translation_scale
+                output.extrinsics = extrinsics
+
+            output.is_metric = 1
         return output
 
     def _process_mono_sky_estimation(

@@ -72,8 +72,8 @@ import glob, os, torch
 from depth_anything_3.api import DepthAnything3
 from safetensors.torch import load_file
 
-# 1) Build the DA-Next network with the matching backbone size
-api = DepthAnything3(model_name="da3-giant")
+# 1) Build DA-Next with the metric config (includes the scale token/head)
+api = DepthAnything3(model_name="da3-giant-metric")
 
 # 2) Load fine-tuned weights
 sd = load_file("checkpoint_path_here")

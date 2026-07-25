@@ -8,8 +8,8 @@ device = torch.device("cuda")
 
 ckpt = "outputs/DAN-Giant-test/checkpoint-0-5000/model.safetensors"
 
-# 1) 先用正确的 model_name 构建网络结构（要和你训练时一致）
-api = DepthAnything3(model_name="da3-giant")  # 例如 giant 就填 da3-giant
+# 1) 使用带 scale token/head 的 metric 配置（必须与 DA-Next 训练结构一致）
+api = DepthAnything3(model_name="da3-giant-metric")
 
 # 2) 读权重（这是 DepthAnything3Net 的 key：backbone/head/...）
 sd = load_file(ckpt)
@@ -20,7 +20,7 @@ print("missing:", len(missing), "unexpected:", len(unexpected))
 
 api = api.to("cuda").eval()
 
-model = create_object(load_config("src/depth_anything_3/configs/da3-giant.yaml"))
+model = create_object(load_config("src/depth_anything_3/configs/da3-giant-metric.yaml"))
 # 加载预训练权重
 state_dict = load_file("outputs/DAN-Giant-test/checkpoint-0-5000/model.safetensors")
 for k in list(state_dict.keys()):
